@@ -110,7 +110,7 @@ exports.getInterestedUsers = async (req, res) => {
     .select('*, adopter_id ( id, name )')
     .eq('pet_id', petId)
     .eq('interested', true)
-    .is('giver_response', null); // aún no respondidos
+    .is('giver_response', null);
 
   if (error) {
     console.error("Error obteniendo interesados:", error);

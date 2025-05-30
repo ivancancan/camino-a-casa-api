@@ -1,5 +1,3 @@
-// src/controllers/match.controller.js
-
 const supabase = require('../config/supabaseClient');
 
 exports.getConfirmedMatchesForGiver = async (req, res) => {
@@ -49,13 +47,12 @@ exports.getConfirmedMatchesForGiver = async (req, res) => {
 
       const { data: giverSwipe } = await supabase
         .from('swipes')
-        .select('interested')
-        .eq('giver_id', userId)
+        .select('giver_response')
         .eq('adopter_id', adopter_id)
         .eq('pet_id', pet_id)
         .maybeSingle();
 
-      if (adopterSwipe?.interested && giverSwipe?.interested) {
+      if (adopterSwipe?.interested && giverSwipe?.giver_response === true) {
         confirmedMatches.push(match);
       }
     } catch (err) {
