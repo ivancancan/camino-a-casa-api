@@ -80,7 +80,6 @@ exports.uploadPetPhoto = async (req, res) => {
       return res.status(400).json({ error: 'El archivo no es una imagen válida.' });
     }
 
-    // Crear cliente con SERVICE_ROLE_KEY para subir imágenes a Supabase Storage
     const serviceClient = createClient(
       process.env.SUPABASE_URL,
       process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -111,4 +110,39 @@ exports.uploadPetPhoto = async (req, res) => {
     console.error('Error al subir foto de mascota:', error);
     res.status(500).json({ error: 'Error interno del servidor' });
   }
+};
+
+// GET /api/giver/profile
+exports.getGiverProfile = async (req, res) => {
+  const userId = req.user.id;
+
+  const { data, error } = await supabase
+    .from('giver_profiles')
+    .select('foto')
+    .eq('user_id', userId)
+    .maybeSingle();
+
+  if (error) {
+    console.error('❌ Error al obtener perfil del giver:', error.message);
+    return res.status(500).json({ error: 'No se pudo obtener el perfil' });
+  }
+
+  res.status(200).json({ profile: data });
+};
+
+// POST /api/giver/profile
+exports.saveGiverProfile = async (req, res) => {
+  const userId = req.user.id;
+  const { foto } = req.body;
+
+  const { data, error } = await supabase
+    .from('giver_profiles')
+    .upsert([{ user_id: userId, foto }], { onConflict: ['user_id'] });
+
+  if (error) {
+    console.error('❌ Error al guardar foto del giver:', error.message);
+    return res.status(500).json({ error: 'No se pudo guardar la foto' });
+  }
+
+  res.status(200).json({ profile: data?.[0] });
 };
