@@ -5,5 +5,7 @@ const authenticateUser = require('../middleware/auth.middleware');
 
 router.get('/giver/confirmed', authenticateUser, matchController.getConfirmedMatchesForGiver);
 router.get('/adopter/confirmed', authenticateUser, matchController.getConfirmedMatchesForAdopter);
+router.post('/create-conversation/:matchId', authenticateUser, matchController.createConversationIfNotExists);
+
 
 module.exports = router;

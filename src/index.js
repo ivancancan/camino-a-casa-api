@@ -21,6 +21,8 @@ const adopterRoutes = require('./routes/adopter.routes');
 const swipeRoutes = require('./routes/swipe.routes');
 const giverRoutes = require('./routes/giver.routes');
 const matchRoutes = require('./routes/match.routes'); // ✅ NUEVO
+const messageRoutes = require('./routes/message.routes'); // ✅ NUEVO
+
 
 app.use('/api/auth', authRoutes);
 app.use('/api/pets', petRoutes);
@@ -28,6 +30,8 @@ app.use('/api/adopter', adopterRoutes);
 app.use('/api/swipes', swipeRoutes);
 app.use('/api/giver', giverRoutes);
 app.use('/api/matches', matchRoutes); // ✅ NUEVO
+app.use('/api/messages', messageRoutes); // ✅ NUEVO
+
 
 // Ruta base
 app.get('/', (req, res) => {

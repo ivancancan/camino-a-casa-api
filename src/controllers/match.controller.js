@@ -17,7 +17,6 @@ exports.getConfirmedMatchesForGiver = async (req, res) => {
   const petIds = pets.map(p => p.id);
   if (petIds.length === 0) return res.status(200).json({ matches: [] });
 
-  // Obtener matches con adopter_profiles y su usuario (para obtener name)
   const { data: matches, error: matchesError } = await supabase
     .from('matches')
     .select(`
@@ -44,7 +43,6 @@ exports.getConfirmedMatchesForGiver = async (req, res) => {
     return res.status(500).json({ error: 'Error al obtener los matches' });
   }
 
-  // Filtrar matches confirmados (interés mutuo)
   const confirmedMatches = [];
   for (const match of matches) {
     const { adopter_id, pet_id } = match;
@@ -77,7 +75,6 @@ exports.getConfirmedMatchesForGiver = async (req, res) => {
 exports.getConfirmedMatchesForAdopter = async (req, res) => {
   const userId = req.user.id;
 
-  // Obtener matches del adoptante, con info del dueño (user y perfil)
   const { data: matches, error: matchesError } = await supabase
     .from('matches')
     .select(`
@@ -105,7 +102,6 @@ exports.getConfirmedMatchesForAdopter = async (req, res) => {
     return res.status(500).json({ error: 'Error al obtener los matches', detail: matchesError.message });
   }
 
-  // Filtrar solo matches confirmados (interés mutuo)
   const confirmedMatches = [];
   for (const match of matches) {
     const { adopter_id, pet_id } = match;
@@ -133,4 +129,37 @@ exports.getConfirmedMatchesForAdopter = async (req, res) => {
   }
 
   return res.status(200).json(confirmedMatches);
+};
+
+// ✅ NUEVO: Crear conversación si no existe
+exports.createConversationIfNotExists = async (req, res) => {
+  const { matchId } = req.params;
+
+  const { data: existing, error: findError } = await supabase
+    .from('conversations')
+    .select('id')
+    .eq('match_id', matchId)
+    .maybeSingle();
+
+  if (findError) {
+    console.error('❌ Error al verificar conversación existente:', findError.message);
+    return res.status(500).json({ error: findError.message });
+  }
+
+  if (existing) {
+    return res.status(200).json({ message: 'Ya existe conversación', id: existing.id });
+  }
+
+  const { data, error } = await supabase
+    .from('conversations')
+    .insert([{ match_id: matchId }])
+    .select()
+    .single();
+
+  if (error) {
+    console.error('❌ Error al crear conversación:', error.message);
+    return res.status(500).json({ error: error.message });
+  }
+
+  res.status(201).json({ message: 'Conversación creada', conversation: data });
 };
