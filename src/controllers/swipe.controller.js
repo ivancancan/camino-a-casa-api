@@ -74,9 +74,11 @@ exports.getSuggestions = async (req, res) => {
 
   const swipedIds = swipes?.map((s) => s.pet_id) || [];
 
-  let query = supabase
-    .from('pets')
-    .select('*');
+let query = supabase
+  .from('pets')
+  .select('*')
+  .eq('status', 'disponible'); // ✅ Solo mostrar mascotas disponibles
+
 
   if (swipedIds.length > 0) {
     query = query.not('id', 'in', `(${swipedIds.join(',')})`);

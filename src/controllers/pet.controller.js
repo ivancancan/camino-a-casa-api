@@ -1,3 +1,5 @@
+// src/controllers/pet.controller.js
+
 const supabase = require('../config/supabaseClient');
 
 exports.createPet = async (req, res) => {
@@ -13,9 +15,20 @@ exports.createPet = async (req, res) => {
   }
 
   const { data, error } = await supabase.from('pets').insert([{
-    owner_id: userId, nombre, sexo, edad, talla, caracter,
-    convive_con: conviveCon, vacunado, esterilizado, desparasitado,
-    telefono_contacto: telefono, fotos, descripcion,
+    owner_id: userId,
+    nombre,
+    sexo,
+    edad,
+    talla,
+    caracter,
+    convive_con: conviveCon,
+    vacunado,
+    esterilizado,
+    desparasitado,
+    telefono_contacto: telefono,
+    fotos,
+    descripcion,
+    status: 'disponible',
   }]);
 
   if (error) {
@@ -57,7 +70,6 @@ exports.getMyPetsWithInterest = async (req, res) => {
     return res.status(500).json({ error: 'No se pudieron obtener las mascotas' });
   }
 
-  // Obtener swipes pendientes (interesado = true y giver_response = null)
   const petIds = pets.map(p => p.id);
 
   const { data: swipesData, error: swipesError } = await supabase
@@ -72,7 +84,6 @@ exports.getMyPetsWithInterest = async (req, res) => {
     return res.status(500).json({ error: 'No se pudieron contar interesados.' });
   }
 
-  // Contar interesados por pet_id
   const countByPet = {};
   for (const swipe of swipesData) {
     countByPet[swipe.pet_id] = (countByPet[swipe.pet_id] || 0) + 1;
@@ -108,9 +119,18 @@ exports.updatePet = async (req, res) => {
   const { error: updateError } = await supabase
     .from('pets')
     .update({
-      nombre, sexo, edad, talla, caracter,
-      convive_con: conviveCon, vacunado, esterilizado,
-      desparasitado, telefono_contacto: telefono, fotos, descripcion,
+      nombre,
+      sexo,
+      edad,
+      talla,
+      caracter,
+      convive_con: conviveCon,
+      vacunado,
+      esterilizado,
+      desparasitado,
+      telefono_contacto: telefono,
+      fotos,
+      descripcion,
     })
     .eq('id', petId);
 
@@ -150,4 +170,147 @@ exports.deletePet = async (req, res) => {
   }
 
   res.status(200).json({ message: 'Mascota borrada correctamente' });
+};
+
+exports.markAsAdopted = async (req, res) => {
+  const userId = req.user.id;
+  const petId = req.params.id;
+
+  const { data: pet, error: fetchError } = await supabase
+    .from('pets')
+    .select('id, owner_id, nombre')
+    .eq('id', petId)
+    .single();
+
+  if (fetchError || !pet || pet.owner_id !== userId) {
+    return res.status(403).json({ error: 'No tienes permiso para modificar esta mascota.' });
+  }
+
+  const { error: updateError } = await supabase
+    .from('pets')
+    .update({ status: 'adoptado' })
+    .eq('id', petId);
+
+  if (updateError) {
+    console.error('❌ Error al marcar mascota como adoptada:', updateError.message);
+    return res.status(500).json({ error: 'No se pudo actualizar el estado de la mascota.' });
+  }
+
+  const { data: matches, error: matchesError } = await supabase
+    .from('matches')
+    .select('id')
+    .eq('pet_id', petId);
+
+  if (!matchesError && matches.length > 0) {
+    for (const match of matches) {
+      try {
+        let { data: convo, error: convoError } = await supabase
+          .from('conversations')
+          .select('id')
+          .eq('match_id', match.id)
+          .maybeSingle();
+
+        if (!convo) {
+          const { data: newConvo, error: createError } = await supabase
+            .from('conversations')
+            .insert([{ match_id: match.id }])
+            .select()
+            .single();
+
+          if (createError) {
+            console.error('❌ Error al crear conversación:', createError.message);
+            continue;
+          }
+
+          convo = newConvo;
+        }
+
+        const { error: messageError } = await supabase
+          .from('messages')
+          .insert([{
+            conversation_id: convo.id,
+            message: `🐾 Hola, ${pet.nombre} ya fue adoptado. ¡Gracias por tu interés!`,
+          }]);
+
+        if (messageError) {
+          console.error('❌ Error al insertar mensaje:', messageError.message);
+        }
+      } catch (e) {
+        console.error('❌ Error inesperado en loop de mensajes:', e);
+      }
+    }
+  }
+
+  res.status(200).json({ message: 'Mascota marcada como adoptada.' });
+};
+
+exports.markAsAvailable = async (req, res) => {
+  const userId = req.user.id;
+  const petId = req.params.id;
+
+  const { data: pet, error: fetchError } = await supabase
+    .from('pets')
+    .select('id, owner_id, nombre')
+    .eq('id', petId)
+    .single();
+
+  if (fetchError || !pet || pet.owner_id !== userId) {
+    return res.status(403).json({ error: 'No tienes permiso para modificar esta mascota.' });
+  }
+
+  const { error: updateError } = await supabase
+    .from('pets')
+    .update({ status: 'disponible' })
+    .eq('id', petId);
+
+  if (updateError) {
+    return res.status(500).json({ error: 'No se pudo actualizar el estado de la mascota.' });
+  }
+
+  const { data: matches, error: matchError } = await supabase
+    .from('matches')
+    .select('id')
+    .eq('pet_id', petId);
+
+  if (!matchError && matches.length > 0) {
+    for (const match of matches) {
+      try {
+        let { data: conversation, error: convoError } = await supabase
+          .from('conversations')
+          .select('id')
+          .eq('match_id', match.id)
+          .maybeSingle();
+
+        if (!conversation) {
+          const { data: newConvo, error: createError } = await supabase
+            .from('conversations')
+            .insert([{ match_id: match.id }])
+            .select()
+            .single();
+
+          if (createError) {
+            console.error('❌ Error al crear conversación:', createError.message);
+            continue;
+          }
+
+          conversation = newConvo;
+        }
+
+        const { error: messageError } = await supabase
+          .from('messages')
+          .insert({
+            conversation_id: conversation.id,
+            message: `🐶 ¡Buenas noticias! ${pet.nombre} está nuevamente disponible para adopción.`,
+          });
+
+        if (messageError) {
+          console.error('❌ Error al insertar mensaje:', messageError.message);
+        }
+      } catch (e) {
+        console.error('❌ Error inesperado en loop de disponibilidad:', e);
+      }
+    }
+  }
+
+  res.status(200).json({ message: 'Mascota marcada como disponible y mensajes enviados.' });
 };

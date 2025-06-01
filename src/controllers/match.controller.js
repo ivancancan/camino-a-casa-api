@@ -30,11 +30,12 @@ exports.getConfirmedMatchesForGiver = async (req, res) => {
           email
         )
       ),
-      pets (
-        id,
-        nombre,
-        fotos
-      )
+pets (
+  id,
+  nombre,
+  fotos,
+  status
+)
     `)
     .in('pet_id', petIds);
 
@@ -79,21 +80,23 @@ exports.getConfirmedMatchesForAdopter = async (req, res) => {
     .from('matches')
     .select(`
       *,
-      pets (
-        id,
-        nombre,
-        descripcion,
-        fotos,
-        owner_id,
-        users (
-          id,
-          name,
-          email,
-          giver_profiles (
-            foto
-          )
-        )
-      )
+pets (
+  id,
+  nombre,
+  descripcion,
+  fotos,
+  status,
+  owner_id,
+  users (
+    id,
+    name,
+    email,
+    giver_profiles (
+      foto
+    )
+  )
+)
+
     `)
     .eq('adopter_id', userId);
 
