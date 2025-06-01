@@ -166,3 +166,77 @@ exports.createConversationIfNotExists = async (req, res) => {
 
   res.status(201).json({ message: 'Conversación creada', conversation: data });
 };
+
+exports.getUnseenMatchesCount = async (req, res) => {
+  const userId = req.user.id;
+
+  const { data: pets } = await supabase
+    .from('pets')
+    .select('id, owner_id');
+
+  const myPets = pets.filter(p => p.owner_id === userId).map(p => p.id);
+
+  const { data: matches, error } = await supabase
+    .from('matches')
+    .select('id, adopter_id, pet_id, is_seen_by_adopter, is_seen_by_giver');
+
+  if (error) {
+    console.error('❌ Error al contar unseen matches:', error.message);
+    return res.status(500).json({ error: error.message });
+  }
+
+  const unseen = matches.filter(match => {
+    if (match.adopter_id === userId) return match.is_seen_by_adopter === false;
+    if (myPets.includes(match.pet_id)) return match.is_seen_by_giver === false;
+    return false;
+  });
+
+  res.status(200).json({ unseenCount: unseen.length });
+};
+
+exports.markMatchesAsSeen = async (req, res) => {
+  const userId = req.user.id;
+
+  const { data: pets } = await supabase
+    .from('pets')
+    .select('id, owner_id');
+
+  const myPets = pets.filter(p => p.owner_id === userId).map(p => p.id);
+
+  const { data: matches, error } = await supabase
+    .from('matches')
+    .select('id, adopter_id, pet_id');
+
+  if (error) {
+    console.error('❌ Error al obtener matches para marcar vistos:', error.message);
+    return res.status(500).json({ error: error.message });
+  }
+
+  const updates = [];
+
+  for (const match of matches) {
+    if (match.adopter_id === userId) {
+      updates.push(
+        supabase
+          .from('matches')
+          .update({ is_seen_by_adopter: true })
+          .eq('id', match.id)
+      );
+    } else if (myPets.includes(match.pet_id)) {
+      updates.push(
+        supabase
+          .from('matches')
+          .update({ is_seen_by_giver: true })
+          .eq('id', match.id)
+      );
+    }
+  }
+
+  try {
+    await Promise.all(updates);
+    res.status(200).json({ message: 'Todos los matches confirmados marcados como vistos' });
+  } catch (err) {
+    console.error('❌ Error al actualizar matches:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+};

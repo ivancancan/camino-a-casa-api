@@ -9,7 +9,6 @@ exports.registerSwipe = async (req, res) => {
     return res.status(400).json({ error: 'Campos inválidos o incompletos' });
   }
 
-  // Insertar swipe
   const { error: swipeError } = await supabase
     .from('swipes')
     .insert([{ adopter_id: adopterId, pet_id: petId, interested }]);
@@ -20,7 +19,6 @@ exports.registerSwipe = async (req, res) => {
     return res.status(200).json({ message: 'Swipe registrado' });
   }
 
-  // Obtener dueño de la mascota
   const { data: pet, error: petError } = await supabase
     .from('pets')
     .select('owner_id')
@@ -31,7 +29,6 @@ exports.registerSwipe = async (req, res) => {
     return res.status(400).json({ error: 'No se encontró la mascota' });
   }
 
-  // Verificar si el match ya existe
   const { data: existingMatch } = await supabase
     .from('matches')
     .select('*')
@@ -43,7 +40,6 @@ exports.registerSwipe = async (req, res) => {
     return res.status(200).json({ message: '¡Match ya existía!' });
   }
 
-  // Insertar match
   const { error: matchError } = await supabase
     .from('matches')
     .insert([{ adopter_id: adopterId, pet_id: petId }]);
@@ -72,17 +68,19 @@ exports.getSuggestions = async (req, res) => {
     .select('pet_id')
     .eq('adopter_id', adopterId);
 
-  const swipedIds = swipes?.map((s) => s.pet_id) || [];
+  const swipedIds = swipes?.map((s) => s.pet_id).filter(Boolean) || [];
 
-let query = supabase
-  .from('pets')
-  .select('*')
-  .eq('status', 'disponible'); // ✅ Solo mostrar mascotas disponibles
+  let query = supabase
+    .from('pets')
+    .select('*')
+    .eq('status', 'disponible');
 
+  // ⚠️ Arreglo aquí: pasar arreglo real, no string
+if (swipedIds.length > 0) {
+  const formattedIds = swipedIds.map(id => `"${id}"`).join(',');
+  query = query.filter('id', 'not.in', `(${formattedIds})`);
+}
 
-  if (swipedIds.length > 0) {
-    query = query.not('id', 'in', `(${swipedIds.join(',')})`);
-  }
 
   const tallaFilter = Array.isArray(profile.tallapreferida) ? profile.tallapreferida : [];
   const caracterFilter = Array.isArray(profile.caracterpreferido) ? profile.caracterpreferido : [];
@@ -93,7 +91,9 @@ let query = supabase
   if (caracterFilter.length > 0) {
     query = query.overlaps('caracter', caracterFilter);
   }
-
+console.log('📌 Filtros talla:', tallaFilter);
+console.log('📌 Filtros carácter:', caracterFilter);
+  
   const { data: pets, error: petsError } = await query;
 
   if (petsError) {
@@ -101,8 +101,12 @@ let query = supabase
     return res.status(400).json({ error: petsError.message });
   }
 
+  console.log('🔍 Datos de mascotas filtradas:', pets);
+console.log('🐶 Mascotas sugeridas:', pets.map(p => p.nombre));
+return res.status(200).json(pets);
   return res.status(200).json(pets);
 };
+
 
 exports.getInterestedUsers = async (req, res) => {
   const { petId } = req.params;

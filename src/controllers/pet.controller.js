@@ -1,6 +1,7 @@
 // src/controllers/pet.controller.js
 
 const supabase = require('../config/supabaseClient');
+const { sendSystemMessage } = require('./message.controller'); // ✅ Importación correcta
 
 exports.createPet = async (req, res) => {
   const userId = req.user.id;
@@ -225,16 +226,10 @@ exports.markAsAdopted = async (req, res) => {
           convo = newConvo;
         }
 
-        const { error: messageError } = await supabase
-          .from('messages')
-          .insert([{
-            conversation_id: convo.id,
-            message: `🐾 Hola, ${pet.nombre} ya fue adoptado. ¡Gracias por tu interés!`,
-          }]);
-
-        if (messageError) {
-          console.error('❌ Error al insertar mensaje:', messageError.message);
-        }
+        await sendSystemMessage(
+          convo.id,
+          `🐾 Hola, ${pet.nombre} ya fue adoptado. ¡Gracias por tu interés!`
+        );
       } catch (e) {
         console.error('❌ Error inesperado en loop de mensajes:', e);
       }
@@ -296,16 +291,10 @@ exports.markAsAvailable = async (req, res) => {
           conversation = newConvo;
         }
 
-        const { error: messageError } = await supabase
-          .from('messages')
-          .insert({
-            conversation_id: conversation.id,
-            message: `🐶 ¡Buenas noticias! ${pet.nombre} está nuevamente disponible para adopción.`,
-          });
-
-        if (messageError) {
-          console.error('❌ Error al insertar mensaje:', messageError.message);
-        }
+        await sendSystemMessage(
+          conversation.id,
+          `🐶 ¡Buenas noticias! ${pet.nombre} está nuevamente disponible para adopción.`
+        );
       } catch (e) {
         console.error('❌ Error inesperado en loop de disponibilidad:', e);
       }
