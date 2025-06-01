@@ -1,3 +1,4 @@
+// src/controllers/message.controller.js
 const supabase = require('../config/supabaseClient');
 
 exports.sendMessage = async (req, res) => {
@@ -45,7 +46,7 @@ exports.getConversationsForUser = async (req, res) => {
     .select(`
       id,
       match_id,
-      messages(message, created_at),
+      messages(id, message, sender_id, is_read, created_at),
       matches (
         id,
         adopter_id,
@@ -122,13 +123,78 @@ exports.getConversationsForUser = async (req, res) => {
             nombre: adopter?.nombre || 'Adoptante',
           };
 
+      const unread = conv.messages?.some(m =>
+        m.sender_id !== userId && m.is_read === false
+      );
+
       return {
         id: conv.id,
         pet,
         otherUser,
         lastMessage: conv.messages?.[conv.messages.length - 1]?.message || '',
+        hasUnreadMessages: unread || false,
       };
     });
 
   res.status(200).json({ data: formatted });
 };
+
+exports.getUnreadMessagesCount = async (req, res) => {
+  const userId = req.user.id;
+
+  const { data, error, count } = await supabase
+    .from('messages')
+    .select('id', { count: 'exact', head: true })
+    .neq('sender_id', userId)
+    .eq('is_read', false);
+
+  if (error) {
+    console.error('❌ Error al contar mensajes no leídos:', error.message);
+    return res.status(500).json({ error: error.message });
+  }
+
+  res.status(200).json({ count });
+};
+
+exports.markMessagesAsRead = async (req, res) => {
+  const userId = req.user.id;
+  const { conversationId } = req.params;
+
+  const { error } = await supabase
+    .from('messages')
+    .update({ is_read: true })
+    .eq('conversation_id', conversationId)
+    .neq('sender_id', userId)
+    .eq('is_read', false);
+
+  if (error) {
+    console.error('❌ Error al marcar mensajes como leídos:', error.message);
+    return res.status(500).json({ error: error.message });
+  }
+
+  res.status(200).json({ message: 'Mensajes marcados como leídos' });
+};
+
+exports.getUnreadCountsByConversation = async (req, res) => {
+  const userId = req.user.id;
+
+  const { data, error } = await supabase
+    .from('messages')
+    .select('conversation_id') // ya no se usa count:true porque agrupamos manual
+    .eq('is_read', false)
+    .neq('sender_id', userId); // solo los que no envió él
+
+  if (error) {
+    console.error('❌ Error al contar mensajes no leídos por conversación:', error.message);
+    return res.status(500).json({ error: error.message });
+  }
+
+  // Agrupar por conversation_id
+  const counts = {};
+  data.forEach((msg) => {
+    counts[msg.conversation_id] = (counts[msg.conversation_id] || 0) + 1;
+  });
+
+  res.status(200).json({ counts });
+};
+
