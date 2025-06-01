@@ -30,12 +30,12 @@ exports.getConfirmedMatchesForGiver = async (req, res) => {
           email
         )
       ),
-pets (
-  id,
-  nombre,
-  fotos,
-  status
-)
+      pets (
+        id,
+        nombre,
+        fotos,
+        status
+      )
     `)
     .in('pet_id', petIds);
 
@@ -80,23 +80,22 @@ exports.getConfirmedMatchesForAdopter = async (req, res) => {
     .from('matches')
     .select(`
       *,
-pets (
-  id,
-  nombre,
-  descripcion,
-  fotos,
-  status,
-  owner_id,
-  users (
-    id,
-    name,
-    email,
-    giver_profiles (
-      foto
-    )
-  )
-)
-
+      pets (
+        id,
+        nombre,
+        descripcion,
+        fotos,
+        status,
+        owner_id,
+        users (
+          id,
+          name,
+          email,
+          giver_profiles (
+            foto
+          )
+        )
+      )
     `)
     .eq('adopter_id', userId);
 
@@ -134,7 +133,7 @@ pets (
   return res.status(200).json(confirmedMatches);
 };
 
-// ✅ NUEVO: Crear conversación si no existe
+// Crear conversación si no existe
 exports.createConversationIfNotExists = async (req, res) => {
   const { matchId } = req.params;
 
@@ -170,29 +169,79 @@ exports.createConversationIfNotExists = async (req, res) => {
 exports.getUnseenMatchesCount = async (req, res) => {
   const userId = req.user.id;
 
-  const { data: pets } = await supabase
+  // Obtener mascotas del usuario (giver)
+  const { data: myPets, error: petsError } = await supabase
     .from('pets')
-    .select('id, owner_id');
+    .select('id')
+    .eq('owner_id', userId);
 
-  const myPets = pets.filter(p => p.owner_id === userId).map(p => p.id);
+  if (petsError) {
+    console.error('❌ Error al obtener mascotas del usuario:', petsError.message);
+    return res.status(500).json({ error: petsError.message });
+  }
 
+  const myPetIds = myPets?.map(p => p.id) || [];
+
+  // Construir filtro condicional para la consulta
+  let filterString;
+  if (myPetIds.length > 0) {
+    filterString = `adopter_id.eq.${userId},pet_id.in.(${myPetIds.join(',')})`;
+  } else {
+    filterString = `adopter_id.eq.${userId}`;
+  }
+
+  // Obtener matches relevantes y no vistos
   const { data: matches, error } = await supabase
     .from('matches')
-    .select('id, adopter_id, pet_id, is_seen_by_adopter, is_seen_by_giver');
+    .select(`
+      id,
+      adopter_id,
+      pet_id,
+      is_seen_by_adopter,
+      is_seen_by_giver
+    `)
+    .or(filterString);
 
   if (error) {
-    console.error('❌ Error al contar unseen matches:', error.message);
+    console.error('❌ Error al obtener matches para contar unseen:', error.message);
     return res.status(500).json({ error: error.message });
   }
 
-  const unseen = matches.filter(match => {
-    if (match.adopter_id === userId) return match.is_seen_by_adopter === false;
-    if (myPets.includes(match.pet_id)) return match.is_seen_by_giver === false;
-    return false;
-  });
+  let count = 0;
 
-  res.status(200).json({ unseenCount: unseen.length });
+  for (const match of matches) {
+    try {
+      // Consultar swipes relacionados para el match
+      const { data: adopterSwipe } = await supabase
+        .from('swipes')
+        .select('interested')
+        .eq('adopter_id', match.adopter_id)
+        .eq('pet_id', match.pet_id)
+        .maybeSingle();
+
+      const { data: giverSwipe } = await supabase
+        .from('swipes')
+        .select('giver_response')
+        .eq('adopter_id', match.adopter_id)
+        .eq('pet_id', match.pet_id)
+        .maybeSingle();
+
+      const confirmed = adopterSwipe?.interested && giverSwipe?.giver_response === true;
+
+      if (!confirmed) continue;
+
+      // Contar solo si no ha sido visto según el rol del usuario
+      if (match.adopter_id === userId && match.is_seen_by_adopter === false) count++;
+      else if (myPetIds.includes(match.pet_id) && match.is_seen_by_giver === false) count++;
+    } catch (err) {
+      console.error('❌ Error al verificar swipes para match:', err.message);
+    }
+  }
+
+  return res.status(200).json({ unseenCount: count });
 };
+
+
 
 exports.markMatchesAsSeen = async (req, res) => {
   const userId = req.user.id;

@@ -9,6 +9,18 @@ exports.registerSwipe = async (req, res) => {
     return res.status(400).json({ error: 'Campos inválidos o incompletos' });
   }
 
+  // Prevenir duplicados
+  const { data: existingSwipe } = await supabase
+    .from('swipes')
+    .select('*')
+    .eq('adopter_id', adopterId)
+    .eq('pet_id', petId)
+    .maybeSingle();
+
+  if (existingSwipe) {
+    return res.status(200).json({ message: 'Swipe ya registrado' });
+  }
+
   const { error: swipeError } = await supabase
     .from('swipes')
     .insert([{ adopter_id: adopterId, pet_id: petId, interested }]);
@@ -75,12 +87,10 @@ exports.getSuggestions = async (req, res) => {
     .select('*')
     .eq('status', 'disponible');
 
-  // ⚠️ Arreglo aquí: pasar arreglo real, no string
-if (swipedIds.length > 0) {
-  const formattedIds = swipedIds.map(id => `"${id}"`).join(',');
-  query = query.filter('id', 'not.in', `(${formattedIds})`);
-}
-
+  if (swipedIds.length > 0) {
+    const formattedIds = swipedIds.map(id => `"${id}"`).join(',');
+    query = query.filter('id', 'not.in', `(${formattedIds})`);
+  }
 
   const tallaFilter = Array.isArray(profile.tallapreferida) ? profile.tallapreferida : [];
   const caracterFilter = Array.isArray(profile.caracterpreferido) ? profile.caracterpreferido : [];
@@ -91,9 +101,10 @@ if (swipedIds.length > 0) {
   if (caracterFilter.length > 0) {
     query = query.overlaps('caracter', caracterFilter);
   }
-console.log('📌 Filtros talla:', tallaFilter);
-console.log('📌 Filtros carácter:', caracterFilter);
-  
+
+  console.log('📌 Filtros talla:', tallaFilter);
+  console.log('📌 Filtros carácter:', caracterFilter);
+
   const { data: pets, error: petsError } = await query;
 
   if (petsError) {
@@ -102,11 +113,9 @@ console.log('📌 Filtros carácter:', caracterFilter);
   }
 
   console.log('🔍 Datos de mascotas filtradas:', pets);
-console.log('🐶 Mascotas sugeridas:', pets.map(p => p.nombre));
-return res.status(200).json(pets);
+  console.log('🐶 Mascotas sugeridas:', pets.map(p => p.nombre));
   return res.status(200).json(pets);
 };
-
 
 exports.getInterestedUsers = async (req, res) => {
   const { petId } = req.params;

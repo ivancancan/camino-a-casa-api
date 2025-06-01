@@ -18,4 +18,13 @@ router.get('/profile', verifyToken, giverController.getGiverProfile);
 // Guardar/actualizar perfil del giver (foto)
 router.post('/profile', verifyToken, giverController.saveGiverProfile);
 
+const upload = require('../middleware/upload.middleware');
+
+router.post(
+  '/upload-photo',
+  verifyToken,
+  upload.single('file'),
+  giverController.uploadPhoto
+);
+
 module.exports = router;

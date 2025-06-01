@@ -146,3 +146,50 @@ exports.saveGiverProfile = async (req, res) => {
 
   res.status(200).json({ profile: data?.[0] });
 };
+
+// POST /api/giver/upload-photo
+exports.uploadPhoto = async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    if (!req.files || !req.files.file) {
+      return res.status(400).json({ error: 'No se envió ninguna imagen.' });
+    }
+
+    const file = req.files.file;
+
+    if (!file.mimetype.startsWith('image/')) {
+      return res.status(400).json({ error: 'El archivo no es una imagen válida.' });
+    }
+
+    const serviceClient = createClient(
+      process.env.SUPABASE_URL,
+      process.env.SUPABASE_SERVICE_ROLE_KEY
+    );
+
+    const buffer = file.data;
+    const fileName = `giver-photos/giver-${userId}-${uuidv4()}.jpg`;
+
+    const result = await serviceClient.storage
+      .from('giver-photos')
+      .upload(fileName, buffer, {
+        contentType: file.mimetype,
+        upsert: true,
+      });
+
+    if (result.error) {
+      return res.status(500).json({ error: 'No se pudo subir la imagen', details: result.error });
+    }
+
+    const { data: publicData } = serviceClient.storage
+      .from('giver-photos')
+      .getPublicUrl(fileName);
+
+    const publicUrl = publicData.publicUrl;
+
+    res.status(200).json({ message: 'Imagen subida', url: publicUrl });
+  } catch (error) {
+    console.error('❌ Error al subir foto de perfil del giver:', error);
+    res.status(500).json({ error: 'Error interno del servidor' });
+  }
+};

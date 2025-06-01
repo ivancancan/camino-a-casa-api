@@ -9,6 +9,4 @@ router.post('/create-conversation/:matchId', authenticateUser, matchController.c
 router.get('/unseen-count', authenticateUser, matchController.getUnseenMatchesCount);
 router.patch('/mark-seen', authenticateUser, matchController.markMatchesAsSeen);
 
-
-
 module.exports = router;
