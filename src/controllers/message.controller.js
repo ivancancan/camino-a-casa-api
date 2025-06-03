@@ -175,12 +175,33 @@ exports.getConversationsForUser = async (req, res) => {
   res.status(200).json({ data: formatted });
 };
 
+// ✅ CORREGIDO: solo cuenta mensajes no leídos en conversaciones del usuario
 exports.getUnreadMessagesCount = async (req, res) => {
   const userId = req.user.id;
+
+  const { data: conversations, error: convError } = await supabase
+    .from('conversations')
+    .select('id, matches ( adopter_id, pets ( owner_id ) )');
+
+  if (convError) {
+    console.error('❌ Error al obtener conversaciones del usuario:', convError.message);
+    return res.status(500).json({ error: convError.message });
+  }
+
+  const validConversationIds = conversations
+    .filter(c =>
+      c.matches?.adopter_id === userId || c.matches?.pets?.owner_id === userId
+    )
+    .map(c => c.id);
+
+  if (validConversationIds.length === 0) {
+    return res.status(200).json({ count: 0 });
+  }
 
   const { count, error } = await supabase
     .from('messages')
     .select('id', { count: 'exact', head: true })
+    .in('conversation_id', validConversationIds)
     .neq('sender_id', userId)
     .eq('is_read', false);
 
