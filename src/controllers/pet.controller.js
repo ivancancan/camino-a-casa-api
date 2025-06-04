@@ -1,5 +1,4 @@
 // src/controllers/pet.controller.js
-
 const supabase = require('../config/supabaseClient');
 const { sendSystemMessage } = require('./message.controller');
 const { v4: uuidv4 } = require('uuid');
@@ -176,14 +175,19 @@ exports.deletePet = async (req, res) => {
 };
 
 exports.markAsAdopted = async (req, res) => {
+  console.log('📦 markAsAdopted triggered');
   const petId = req.params.id;
+  console.log('🐶 Pet ID:', petId);
 
   const { error } = await supabase
     .from('pets')
     .update({ status: 'adoptado' })
     .eq('id', petId);
 
-  if (error) return res.status(500).json({ error: 'Error al actualizar estado.' });
+  if (error) {
+    console.error('❌ Error al actualizar status:', error.message);
+    return res.status(500).json({ error: 'Error al actualizar estado.' });
+  }
 
   const { data: petData, error: petError } = await supabase
     .from('pets')
@@ -192,60 +196,62 @@ exports.markAsAdopted = async (req, res) => {
     .single();
 
   if (petError || !petData) {
+    console.error('❌ No se encontró la mascota');
     return res.status(404).json({ error: 'Mascota no encontrada.' });
   }
 
-  const { data: matchData } = await supabase
+  console.log('✅ Mascota encontrada:', petData.nombre);
+
+  const { data: matches, error: matchError } = await supabase
     .from('matches')
-    .select('id, adopter_id')
+    .select('id')
     .eq('pet_id', petId)
-    .maybeSingle();
+    .eq('confirmed', true);
 
-  if (matchData) {
-    const { data: adopterSwipe } = await supabase
-      .from('swipes')
-      .select('interested')
-      .eq('adopter_id', matchData.adopter_id)
-      .eq('pet_id', petId)
+  if (matchError || !matches || matches.length === 0) {
+    console.warn('⚠️ No hay matches confirmados para esta mascota.');
+    return res.status(200).json({ message: 'Mascota marcada como adoptada' });
+  }
+
+  for (const match of matches) {
+    const { data: conversationData, error: convError } = await supabase
+      .from('conversations')
+      .select('id')
+      .eq('match_id', match.id)
       .maybeSingle();
 
-    const { data: giverSwipe } = await supabase
-      .from('swipes')
-      .select('giver_response')
-      .eq('adopter_id', matchData.adopter_id)
-      .eq('pet_id', petId)
-      .maybeSingle();
+    if (convError) {
+      console.error(`❌ Error buscando conversación para match ${match.id}:`, convError.message);
+      continue;
+    }
 
-    if (adopterSwipe?.interested && giverSwipe?.giver_response === true) {
-      await supabase
-        .from('matches')
-        .update({ confirmed: true })
-        .eq('id', matchData.id);
-
-      const { data: conversationData } = await supabase
-        .from('conversations')
-        .select('id')
-        .eq('match_id', matchData.id)
-        .maybeSingle();
-
-      if (conversationData) {
-        await sendSystemMessage(conversationData.id, `${petData.nombre} ya fue adoptada 🐾`);
-      }
+    if (conversationData) {
+      console.log('💬 Enviando mensaje automático a conversación:', conversationData.id);
+      await sendSystemMessage(conversationData.id, `${petData.nombre} ya fue adoptada 🐾`);
+      console.log('✅ Mensaje automático enviado para match:', match.id);
+    } else {
+      console.warn('⚠️ No se encontró conversación para match:', match.id);
     }
   }
 
   res.status(200).json({ message: 'Mascota marcada como adoptada' });
 };
 
+
 exports.markAsAvailable = async (req, res) => {
+  console.log('📦 markAsAvailable triggered');
   const petId = req.params.id;
+  console.log('🐶 Pet ID:', petId);
 
   const { error } = await supabase
     .from('pets')
     .update({ status: 'disponible' })
     .eq('id', petId);
 
-  if (error) return res.status(500).json({ error: 'Error al actualizar estado.' });
+  if (error) {
+    console.error('❌ Error al actualizar status:', error.message);
+    return res.status(500).json({ error: 'Error al actualizar estado.' });
+  }
 
   const { data: petData, error: petError } = await supabase
     .from('pets')
@@ -254,30 +260,47 @@ exports.markAsAvailable = async (req, res) => {
     .single();
 
   if (petError || !petData) {
+    console.error('❌ No se encontró la mascota');
     return res.status(404).json({ error: 'Mascota no encontrada.' });
   }
 
-  const { data: matchData } = await supabase
+  console.log('✅ Mascota encontrada:', petData.nombre);
+
+  const { data: matches, error: matchError } = await supabase
     .from('matches')
     .select('id')
     .eq('pet_id', petId)
-    .eq('confirmed', true)
-    .maybeSingle();
+    .eq('confirmed', true);
 
-  if (matchData) {
-    const { data: conversationData } = await supabase
+  if (matchError || !matches || matches.length === 0) {
+    console.warn('⚠️ No hay matches confirmados para esta mascota.');
+    return res.status(200).json({ message: 'Mascota marcada como disponible' });
+  }
+
+  for (const match of matches) {
+    const { data: conversationData, error: convError } = await supabase
       .from('conversations')
       .select('id')
-      .eq('match_id', matchData.id)
+      .eq('match_id', match.id)
       .maybeSingle();
 
+    if (convError) {
+      console.error(`❌ Error buscando conversación para match ${match.id}:`, convError.message);
+      continue;
+    }
+
     if (conversationData) {
+      console.log('💬 Enviando mensaje automático: sigue disponible a conversación:', conversationData.id);
       await sendSystemMessage(conversationData.id, `${petData.nombre} sigue disponible 🐶`);
+      console.log('✅ Mensaje automático enviado para match:', match.id);
+    } else {
+      console.warn('⚠️ No se encontró conversación para match:', match.id);
     }
   }
 
   res.status(200).json({ message: 'Mascota marcada como disponible' });
 };
+
 
 exports.uploadPetPhoto = async (req, res) => {
   const { image } = req.body;

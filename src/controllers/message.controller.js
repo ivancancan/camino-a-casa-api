@@ -152,15 +152,22 @@ exports.getConversationsForUser = async (req, res) => {
 
         const unread = unreadMap[conv.id] > 0;
 
-        const { data: lastMessageData, error: lastMsgError } = await supabase
-          .from('messages')
-          .select('message')
-          .eq('conversation_id', conv.id)
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .single();
+const { data: lastMessageData, error: lastMsgError } = await supabase
+  .from('messages')
+  .select('message, sender_id')
+  .eq('conversation_id', conv.id)
+  .order('created_at', { ascending: false })
+  .limit(1)
+  .single();
 
-        const lastMessage = lastMsgError ? '' : lastMessageData?.message || '';
+let lastMessage = '';
+if (!lastMsgError && lastMessageData?.message) {
+  lastMessage = lastMessageData.message;
+  if (lastMessageData.sender_id === '5d295b28-25ce-4e1b-baa1-8fe2e8f805f7') {
+    otherUser.nombre = 'CaminoBot';
+  }
+}
+
 
         return {
           id: conv.id,
