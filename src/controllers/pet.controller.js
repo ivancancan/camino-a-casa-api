@@ -176,55 +176,142 @@ exports.deletePet = async (req, res) => {
 };
 
 exports.markAsAdopted = async (req, res) => {
-  // ... mismo código sin cambios
+  const petId = req.params.id;
+
+  const { error } = await supabase
+    .from('pets')
+    .update({ status: 'adoptado' })
+    .eq('id', petId);
+
+  if (error) return res.status(500).json({ error: 'Error al actualizar estado.' });
+
+  const { data: petData, error: petError } = await supabase
+    .from('pets')
+    .select('nombre')
+    .eq('id', petId)
+    .single();
+
+  if (petError || !petData) {
+    return res.status(404).json({ error: 'Mascota no encontrada.' });
+  }
+
+  const { data: matchData } = await supabase
+    .from('matches')
+    .select('id, adopter_id')
+    .eq('pet_id', petId)
+    .maybeSingle();
+
+  if (matchData) {
+    const { data: adopterSwipe } = await supabase
+      .from('swipes')
+      .select('interested')
+      .eq('adopter_id', matchData.adopter_id)
+      .eq('pet_id', petId)
+      .maybeSingle();
+
+    const { data: giverSwipe } = await supabase
+      .from('swipes')
+      .select('giver_response')
+      .eq('adopter_id', matchData.adopter_id)
+      .eq('pet_id', petId)
+      .maybeSingle();
+
+    if (adopterSwipe?.interested && giverSwipe?.giver_response === true) {
+      await supabase
+        .from('matches')
+        .update({ confirmed: true })
+        .eq('id', matchData.id);
+
+      const { data: conversationData } = await supabase
+        .from('conversations')
+        .select('id')
+        .eq('match_id', matchData.id)
+        .maybeSingle();
+
+      if (conversationData) {
+        await sendSystemMessage(conversationData.id, `${petData.nombre} ya fue adoptada 🐾`);
+      }
+    }
+  }
+
+  res.status(200).json({ message: 'Mascota marcada como adoptada' });
 };
 
 exports.markAsAvailable = async (req, res) => {
-  // ... mismo código sin cambios
+  const petId = req.params.id;
+
+  const { error } = await supabase
+    .from('pets')
+    .update({ status: 'disponible' })
+    .eq('id', petId);
+
+  if (error) return res.status(500).json({ error: 'Error al actualizar estado.' });
+
+  const { data: petData, error: petError } = await supabase
+    .from('pets')
+    .select('nombre')
+    .eq('id', petId)
+    .single();
+
+  if (petError || !petData) {
+    return res.status(404).json({ error: 'Mascota no encontrada.' });
+  }
+
+  const { data: matchData } = await supabase
+    .from('matches')
+    .select('id')
+    .eq('pet_id', petId)
+    .eq('confirmed', true)
+    .maybeSingle();
+
+  if (matchData) {
+    const { data: conversationData } = await supabase
+      .from('conversations')
+      .select('id')
+      .eq('match_id', matchData.id)
+      .maybeSingle();
+
+    if (conversationData) {
+      await sendSystemMessage(conversationData.id, `${petData.nombre} sigue disponible 🐶`);
+    }
+  }
+
+  res.status(200).json({ message: 'Mascota marcada como disponible' });
 };
 
 exports.uploadPetPhoto = async (req, res) => {
+  const { image } = req.body;
+
+  if (!image) {
+    return res.status(400).json({ error: 'No se proporcionó ninguna imagen' });
+  }
+
   try {
-    const userId = req.user.id;
-
-    if (!req.files || !req.files.file) {
-      return res.status(400).json({ error: 'No se envió ninguna imagen.' });
-    }
-
-    const file = req.files.file;
-
-    if (!file.mimetype.startsWith('image/')) {
-      return res.status(400).json({ error: 'El archivo no es una imagen válida.' });
-    }
-
-    const serviceClient = createClient(
+    const supabaseService = createClient(
       process.env.SUPABASE_URL,
       process.env.SUPABASE_SERVICE_ROLE_KEY
     );
 
-    const fileName = `pet-photos/pet-${userId}-${uuidv4()}.jpg`;
+    const fileName = `pet-${uuidv4()}.jpg`;
+    const fileBuffer = Buffer.from(image.replace(/^data:image\/\w+;base64,/, ''), 'base64');
 
-    const result = await serviceClient.storage
+    const { error: uploadError } = await supabaseService.storage
       .from('pet-photos')
-      .upload(fileName, file.data, {
-        contentType: file.mimetype,
-        upsert: true,
+      .upload(fileName, fileBuffer, {
+        contentType: 'image/jpeg',
+        upsert: false,
       });
 
-    if (result.error) {
-      return res.status(500).json({ error: 'No se pudo subir la imagen', details: result.error });
+    if (uploadError) {
+      console.error('❌ Error al subir imagen:', uploadError.message);
+      return res.status(500).json({ error: 'No se pudo subir la imagen' });
     }
 
-    const { data: publicData } = serviceClient.storage
-      .from('pet-photos')
-      .getPublicUrl(fileName);
-
-    const publicUrl = publicData.publicUrl;
-
-    return res.status(200).json({ message: 'Imagen subida', url: publicUrl });
-  } catch (error) {
-    console.error('Error al subir foto de mascota:', error);
-    return res.status(500).json({ error: 'Error interno del servidor' });
+    const publicUrl = `${process.env.SUPABASE_URL}/storage/v1/object/public/pet-photos/${fileName}`;
+    res.status(200).json({ url: publicUrl });
+  } catch (err) {
+    console.error('❌ Error inesperado al subir imagen:', err);
+    res.status(500).json({ error: 'Error interno del servidor' });
   }
 };
 
