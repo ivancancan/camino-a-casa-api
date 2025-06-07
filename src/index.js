@@ -1,6 +1,6 @@
 const express = require('express');
 const cors = require('cors');
-require('dotenv').config();
+require('dotenv-flow').config(); // ✅ Cambiado a dotenv-flow para múltiples entornos y Railway
 
 const app = express();
 app.enable('trust proxy'); // ✅ Mover esto después de definir app
@@ -23,7 +23,6 @@ const giverRoutes = require('./routes/giver.routes');
 const matchRoutes = require('./routes/match.routes'); // ✅ NUEVO
 const messageRoutes = require('./routes/message.routes'); // ✅ NUEVO
 
-
 app.use('/api/auth', authRoutes);
 app.use('/api/pets', petRoutes);
 app.use('/api/adopter', adopterRoutes);
@@ -32,13 +31,12 @@ app.use('/api/giver', giverRoutes);
 app.use('/api/matches', matchRoutes); // ✅ NUEVO
 app.use('/api/messages', messageRoutes); // ✅ NUEVO
 
-
 // Ruta base
 app.get('/', (req, res) => {
   res.send('Camino a Casa API is running 🐾');
 });
 
-// Escuchar en todas las interfaces (para que funcione con Ngrok)
+// Escuchar en todas las interfaces (para que funcione con Railway o Ngrok)
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Server listening on http://0.0.0.0:${PORT}`);
 });
