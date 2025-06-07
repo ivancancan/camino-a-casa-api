@@ -14,7 +14,7 @@
     "@supabase/supabase-js": "^2.49.4",
     "bcrypt": "^6.0.0",
     "cors": "^2.8.5",
-    "dotenv": "^16.5.0",
+    "dotenv-flow": "^4.1.0",
     "express": "^5.1.0",
     "express-fileupload": "^1.5.1",
     "jsonwebtoken": "^9.0.2",
