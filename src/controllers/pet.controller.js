@@ -303,10 +303,10 @@ exports.markAsAvailable = async (req, res) => {
 
 
 exports.uploadPetPhoto = async (req, res) => {
-  const { image } = req.body;
+  const file = req.file;
 
-  if (!image) {
-    return res.status(400).json({ error: 'No se proporcionó ninguna imagen' });
+  if (!file) {
+    return res.status(400).json({ error: 'No se recibió ningún archivo' });
   }
 
   try {
@@ -316,12 +316,11 @@ exports.uploadPetPhoto = async (req, res) => {
     );
 
     const fileName = `pet-${uuidv4()}.jpg`;
-    const fileBuffer = Buffer.from(image.replace(/^data:image\/\w+;base64,/, ''), 'base64');
 
     const { error: uploadError } = await supabaseService.storage
       .from('pet-photos')
-      .upload(fileName, fileBuffer, {
-        contentType: 'image/jpeg',
+      .upload(fileName, file.buffer, {
+        contentType: file.mimetype,
         upsert: false,
       });
 
