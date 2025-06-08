@@ -1,4 +1,5 @@
-// src/controllers/pet.controller.jsconst supabase = require('../config/supabaseClient');
+// src/controllers/pet.controller
+const supabase = require('../config/supabaseClient');
 const { sendSystemMessage } = require('./message.controller');
 const { v4: uuidv4 } = require('uuid');
 const { createClient } = require('@supabase/supabase-js');
