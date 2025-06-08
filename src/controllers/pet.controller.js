@@ -303,6 +303,8 @@ exports.markAsAvailable = async (req, res) => {
 
 
 exports.uploadPetPhoto = async (req, res) => {
+  console.log('📸 Subiendo foto de mascota...');
+  console.log('🧾 req.file:', req.file);
   const file = req.file;
 
   if (!file) {
