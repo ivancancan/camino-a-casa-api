@@ -303,7 +303,10 @@ exports.markAsAvailable = async (req, res) => {
 
 
 exports.uploadPetPhoto = async (req, res) => {
-    console.log('🧾 req.file:', req.file); // ✅ Aquí va
+   console.log('📤 Iniciando uploadPetPhoto');
+console.log('📎 Headers:', req.headers);
+  console.log('🧾 req.file:', req.file); // ✅ Aquí va
+    console.log('📦 req.body:', req.body);
 
   try {
     if (!req.file) {

@@ -95,43 +95,34 @@ exports.updateAdopterDescription = async (req, res) => {
   res.status(200).json({ message: 'Descripción actualizada', data });
 };
 
-// Subir imagen a Supabase Storage y guardar la URL pública en el perfil
+// POST /api/adopter/upload-photo (✅ migrado a multer)
 exports.uploadAdopterPhoto = async (req, res) => {
   try {
     const userId = req.user.id;
+    const file = req.file;
 
-    if (!req.files || !req.files.file) {
+    if (!file) {
       console.warn('⚠️ No se envió ningún archivo');
       return res.status(400).json({ error: 'No se envió ninguna imagen.' });
     }
-
-    const file = req.files.file;
-    console.log('🧾 Nombre archivo:', file.name);
-    console.log('🧾 Tipo:', file.mimetype);
-    console.log('🧾 Tamaño:', file.size);
-    console.log('🧾 Buffer definido:', !!file.data);
 
     if (!file.mimetype.startsWith('image/')) {
       return res.status(400).json({ error: 'El archivo no es una imagen válida.' });
     }
 
-    // Cliente con SERVICE_ROLE_KEY
     const serviceClient = createClient(
       process.env.SUPABASE_URL,
       process.env.SUPABASE_SERVICE_ROLE_KEY
     );
 
-    const buffer = file.data;
-    const fileName = `adopter-${userId}-${uuidv4()}.jpg`;
+    const fileName = `adopter-photos/adopter-${userId}-${uuidv4()}.jpg`;
 
     const result = await serviceClient.storage
       .from('adopter-photos')
-      .upload(fileName, buffer, {
+      .upload(fileName, file.buffer, {
         contentType: file.mimetype,
         upsert: true,
       });
-
-    console.log('📤 Resultado del upload:', result);
 
     if (result.error) {
       console.error('❌ Error subiendo imagen completo:', result.error);
@@ -144,7 +135,6 @@ exports.uploadAdopterPhoto = async (req, res) => {
 
     const publicUrl = publicData.publicUrl;
 
-    // Guardar la URL en el perfil
     const { data: updatedProfile, error: updateError } = await baseClient
       .from('adopter_profiles')
       .update({ foto: publicUrl })
@@ -152,7 +142,7 @@ exports.uploadAdopterPhoto = async (req, res) => {
 
     if (updateError) {
       console.error('❌ Error al guardar URL en perfil:', updateError.message);
-      return res.status(500).json({ error: 'No se pudo guardar la imagen en el perfil', details: updateError });
+      return res.status(500).json({ error: 'No se pudo guardar la imagen en el perfil' });
     }
 
     res.status(200).json({ message: 'Imagen subida y guardada', url: publicUrl });

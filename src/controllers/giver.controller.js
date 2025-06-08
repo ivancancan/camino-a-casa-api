@@ -1,4 +1,3 @@
-// controllers/giver.controller.js
 const { v4: uuidv4 } = require('uuid');
 const { createClient } = require('@supabase/supabase-js');
 const supabase = require('../config/supabaseClient');
@@ -65,7 +64,6 @@ exports.respondToSwipe = async (req, res) => {
   return res.status(200).json({ message: '¡Match confirmado!' });
 };
 
-
 // GET /api/giver/profile
 exports.getGiverProfile = async (req, res) => {
   const userId = req.user.id;
@@ -101,16 +99,15 @@ exports.saveGiverProfile = async (req, res) => {
   res.status(200).json({ profile: data?.[0] });
 };
 
-// POST /api/giver/upload-photo
+// POST /api/giver/upload-photo ✅ usando multer
 exports.uploadPhoto = async (req, res) => {
   try {
     const userId = req.user.id;
+    const file = req.file;
 
-    if (!req.files || !req.files.file) {
+    if (!file) {
       return res.status(400).json({ error: 'No se envió ninguna imagen.' });
     }
-
-    const file = req.files.file;
 
     if (!file.mimetype.startsWith('image/')) {
       return res.status(400).json({ error: 'El archivo no es una imagen válida.' });
@@ -121,12 +118,11 @@ exports.uploadPhoto = async (req, res) => {
       process.env.SUPABASE_SERVICE_ROLE_KEY
     );
 
-    const buffer = file.data;
     const fileName = `giver-photos/giver-${userId}-${uuidv4()}.jpg`;
 
     const result = await serviceClient.storage
       .from('giver-photos')
-      .upload(fileName, buffer, {
+      .upload(fileName, file.buffer, {
         contentType: file.mimetype,
         upsert: true,
       });
