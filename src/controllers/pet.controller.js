@@ -1,5 +1,4 @@
-// src/controllers/pet.controller.js
-const supabase = require('../config/supabaseClient');
+// src/controllers/pet.controller.jsconst supabase = require('../config/supabaseClient');
 const { sendSystemMessage } = require('./message.controller');
 const { v4: uuidv4 } = require('uuid');
 const { createClient } = require('@supabase/supabase-js');
@@ -303,39 +302,35 @@ exports.markAsAvailable = async (req, res) => {
 
 
 exports.uploadPetPhoto = async (req, res) => {
-  console.log('📸 Subiendo foto de mascota...');
-  console.log('🧾 req.file:', req.file);
-  const file = req.file;
-
-  if (!file) {
-    return res.status(400).json({ error: 'No se recibió ningún archivo' });
-  }
+    console.log('🧾 req.file:', req.file); // ✅ Aquí va
 
   try {
-    const supabaseService = createClient(
-      process.env.SUPABASE_URL,
-      process.env.SUPABASE_SERVICE_ROLE_KEY
-    );
-
-    const fileName = `pet-${uuidv4()}.jpg`;
-
-    const { error: uploadError } = await supabaseService.storage
-      .from('pet-photos')
-      .upload(fileName, file.buffer, {
-        contentType: file.mimetype,
-        upsert: false,
-      });
-
-    if (uploadError) {
-      console.error('❌ Error al subir imagen:', uploadError.message);
-      return res.status(500).json({ error: 'No se pudo subir la imagen' });
+    if (!req.file) {
+      console.error('❌ No se recibió archivo en la petición');
+      return res.status(400).json({ error: 'No se recibió imagen' });
     }
 
-    const publicUrl = `${process.env.SUPABASE_URL}/storage/v1/object/public/pet-photos/${fileName}`;
-    res.status(200).json({ url: publicUrl });
+    const { originalname, buffer, mimetype } = req.file;
+    const fileExt = originalname.split('.').pop();
+    const fileName = `pet-${Date.now()}.${fileExt}`;
+
+    const { data, error } = await supabase.storage
+      .from('pet-photos')
+      .upload(fileName, buffer, {
+        contentType: mimetype,
+        upsert: true,
+      });
+
+    if (error) {
+      console.error('❌ Error al subir a Supabase:', error.message);
+      return res.status(500).json({ error: error.message });
+    }
+
+    const url = `${process.env.SUPABASE_URL}/storage/v1/object/public/pet-photos/${fileName}`;
+    return res.status(200).json({ url });
   } catch (err) {
-    console.error('❌ Error inesperado al subir imagen:', err);
-    res.status(500).json({ error: 'Error interno del servidor' });
+    console.error('❌ Error general en uploadPetPhoto:', err);
+    return res.status(500).json({ error: 'Error al subir imagen' });
   }
 };
 
