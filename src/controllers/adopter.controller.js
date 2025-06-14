@@ -22,17 +22,24 @@ exports.saveAdopterProfile = async (req, res) => {
     motivacion: profile.motivacion || '',
   };
 
-  console.log('📥 Perfil recibido normalizado:', normalizedProfile);
+  const cleanProfile = Object.fromEntries(
+    Object.entries(normalizedProfile).filter(
+      ([, value]) => value !== '' && value !== null && !(Array.isArray(value) && value.length === 0)
+    )
+  );
+
+  console.log('🧼 Perfil limpio para guardar:', cleanProfile);
 
   const { data, error } = await baseClient
     .from('adopter_profiles')
-    .upsert([{ user_id: userId, ...normalizedProfile }], { onConflict: ['user_id'] });
+    .upsert([{ user_id: userId, ...cleanProfile }], { onConflict: ['user_id'] });
 
   if (error) {
     console.error('❌ Error al guardar perfil adoptante:', error.message);
     return res.status(500).json({ error: 'No se pudo guardar el perfil' });
   }
 
+  console.log('✅ Perfil guardado correctamente:', data);
   res.status(200).json({ message: 'Perfil guardado', data });
 };
 
@@ -51,19 +58,22 @@ exports.hasAdopterProfile = async (req, res) => {
     return res.status(500).json({ error: error.message });
   }
 
-  const exists = !!data;
-  res.status(200).json({ exists });
+  console.log('📌 Perfil existe:', !!data);
+  res.status(200).json({ exists: !!data });
 };
 
 // Obtener perfil del adoptante
 exports.getAdopterProfile = async (req, res) => {
   const userId = req.user.id;
+  console.log('📥 Entrando al endpoint GET /adopter/profile para:', userId);
 
   const { data, error } = await baseClient
     .from('adopter_profiles')
     .select('*')
     .eq('user_id', userId)
     .single();
+
+  console.log('📦 Resultado de Supabase:', { data, error });
 
   if (error && error.code !== 'PGRST116') {
     console.error('❌ Error al obtener perfil adoptante:', error.message);
@@ -92,11 +102,11 @@ exports.updateAdopterDescription = async (req, res) => {
     return res.status(500).json({ error: 'No se pudo actualizar la descripción' });
   }
 
+  console.log('✏️ Motivación actualizada:', data);
   res.status(200).json({ message: 'Descripción actualizada', data });
 };
 
-// POST /api/adopter/upload-photo (✅ migrado a multer)
-// POST /api/adopter/upload-photo (✅ corregido y funcional)
+// Subida de foto del adoptante
 exports.uploadAdopterPhoto = async (req, res) => {
   try {
     const userId = req.user.id;
@@ -104,7 +114,7 @@ exports.uploadAdopterPhoto = async (req, res) => {
     const file = req.files?.find(f => f.fieldname === 'image');
 
     if (!file) {
-      console.warn('⚠️ No se envió ningún archivo con campo \"foto\"');
+      console.warn('⚠️ No se envió ningún archivo con campo "foto"');
       return res.status(400).json({ error: 'No se envió ninguna imagen válida.' });
     }
 
@@ -136,6 +146,7 @@ exports.uploadAdopterPhoto = async (req, res) => {
       .getPublicUrl(fileName);
 
     const publicUrl = publicData.publicUrl;
+    console.log('✅ Imagen subida correctamente. URL pública:', publicUrl);
 
     const { data: updatedProfile, error: updateError } = await baseClient
       .from('adopter_profiles')
@@ -147,10 +158,10 @@ exports.uploadAdopterPhoto = async (req, res) => {
       return res.status(500).json({ error: 'No se pudo guardar la imagen en el perfil' });
     }
 
+    console.log('🖼️ URL guardada correctamente en perfil:', updatedProfile);
     res.status(200).json({ message: 'Imagen subida y guardada', url: publicUrl });
   } catch (error) {
     console.error('❌ Error inesperado al subir imagen:', error.message);
     res.status(500).json({ error: 'Error interno del servidor' });
   }
 };
-
