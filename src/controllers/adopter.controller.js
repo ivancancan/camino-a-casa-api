@@ -96,6 +96,7 @@ exports.updateAdopterDescription = async (req, res) => {
 };
 
 // POST /api/adopter/upload-photo (✅ migrado a multer)
+// POST /api/adopter/upload-photo (✅ corregido y funcional)
 exports.uploadAdopterPhoto = async (req, res) => {
   try {
     const userId = req.user.id;
@@ -151,3 +152,4 @@ exports.uploadAdopterPhoto = async (req, res) => {
     res.status(500).json({ error: 'Error interno del servidor' });
   }
 };
+

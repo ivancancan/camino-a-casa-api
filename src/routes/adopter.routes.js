@@ -12,13 +12,12 @@ const {
   uploadAdopterPhoto,
 } = require('../controllers/adopter.controller');
 
-// Rutas del perfil del adoptante
 router.post('/profile', verifyToken, saveAdopterProfile);
 router.get('/profile', verifyToken, getAdopterProfile);
 router.get('/has-profile', verifyToken, hasAdopterProfile);
 router.post('/profile/motivation', verifyToken, updateAdopterDescription);
 
-// Subida de imagen con multer ✅
-router.post('/upload-photo', verifyToken, upload.single('image'), uploadAdopterPhoto);
+// 👇 CAMBIA esto:
+router.post('/upload-photo', verifyToken, upload.single('foto'), uploadAdopterPhoto);
 
 module.exports = router;

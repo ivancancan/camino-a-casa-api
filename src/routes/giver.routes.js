@@ -22,4 +22,9 @@ router.post('/profile', verifyToken, giverController.saveGiverProfile);
 // Subir foto de perfil del giver (✅ con multer)
 router.post('/upload-photo', verifyToken, upload.single('image'), giverController.uploadPhoto);
 
+// Obtener mascotas del giver con interesados
+router.get('/pets', verifyToken, giverController.getMyPetsWithInterest);
+
 module.exports = router;
+
+

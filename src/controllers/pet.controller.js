@@ -61,43 +61,52 @@ exports.getMyPets = async (req, res) => {
 exports.getMyPetsWithInterest = async (req, res) => {
   const userId = req.user.id;
 
-  const { data: pets, error } = await supabase
+  // Primero obtenemos las mascotas del giver
+  const { data: pets, error: petError } = await supabase
     .from('pets')
-    .select('*, swipes:swipes(count)')
+    .select('*')
     .eq('owner_id', userId)
     .order('created_at', { ascending: false });
 
-  if (error) {
-    console.error('❌ Error al obtener mascotas con interés:', error.message);
+  if (petError) {
+    console.error('❌ Error al obtener mascotas:', petError.message);
     return res.status(500).json({ error: 'No se pudieron obtener las mascotas' });
+  }
+
+  if (!pets || pets.length === 0) {
+    return res.status(200).json({ pets: [] });
   }
 
   const petIds = pets.map(p => p.id);
 
+  // Ahora contamos los interesados reales por cada mascota
   const { data: swipesData, error: swipesError } = await supabase
     .from('swipes')
-    .select('pet_id, count:giver_response')
+    .select('pet_id')
     .eq('interested', true)
     .is('giver_response', null)
     .in('pet_id', petIds);
 
   if (swipesError) {
-    console.error('❌ Error al contar swipes pendientes:', swipesError.message);
-    return res.status(500).json({ error: 'No se pudieron contar interesados.' });
+    console.error('❌ Error al contar interesados:', swipesError.message);
+    return res.status(500).json({ error: 'No se pudieron contar los interesados.' });
   }
 
+  // Contamos por pet_id
   const countByPet = {};
   for (const swipe of swipesData) {
     countByPet[swipe.pet_id] = (countByPet[swipe.pet_id] || 0) + 1;
   }
 
-  const enriched = pets.map(pet => ({
+  // Enriquecemos las mascotas con el conteo
+  const enrichedPets = pets.map(pet => ({
     ...pet,
     interesados: countByPet[pet.id] || 0,
   }));
 
-  res.status(200).json({ pets: enriched });
+  return res.status(200).json({ pets: enrichedPets });
 };
+
 
 exports.updatePet = async (req, res) => {
   const userId = req.user.id;
