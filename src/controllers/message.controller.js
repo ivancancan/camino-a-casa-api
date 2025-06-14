@@ -44,6 +44,7 @@ exports.sendMessage = async (req, res) => {
 
 exports.getMessages = async (req, res) => {
   const { id } = req.params;
+  console.log('📨 Obteniendo mensajes para conversación:', id);
 
   const { data, error } = await supabase
     .from('messages')
@@ -51,13 +52,17 @@ exports.getMessages = async (req, res) => {
     .eq('conversation_id', id)
     .order('created_at', { ascending: true });
 
-  if (error) return res.status(500).json({ error: error.message });
+  if (error) {
+    console.error('❌ Error al obtener mensajes:', error.message);
+    return res.status(500).json({ error: error.message });
+  }
 
   res.status(200).json(data);
 };
 
 exports.getConversationsForUser = async (req, res) => {
   const userId = req.user.id;
+  console.log('👤 Obteniendo conversaciones para usuario:', userId);
 
   const { data: conversations, error } = await supabase
     .from('conversations')
@@ -80,6 +85,8 @@ exports.getConversationsForUser = async (req, res) => {
     console.error('❌ Error al obtener conversaciones:', error.message);
     return res.status(500).json({ error: 'No se pudieron obtener las conversaciones.' });
   }
+
+  console.log('📥 Conversaciones encontradas:', conversations.length);
 
   const adopterIds = [...new Set(conversations.map(c => c.matches?.adopter_id).filter(Boolean))];
 
@@ -152,22 +159,21 @@ exports.getConversationsForUser = async (req, res) => {
 
         const unread = unreadMap[conv.id] > 0;
 
-const { data: lastMessageData, error: lastMsgError } = await supabase
-  .from('messages')
-  .select('message, sender_id')
-  .eq('conversation_id', conv.id)
-  .order('created_at', { ascending: false })
-  .limit(1)
-  .single();
+        const { data: lastMessageData, error: lastMsgError } = await supabase
+          .from('messages')
+          .select('message, sender_id')
+          .eq('conversation_id', conv.id)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .single();
 
-let lastMessage = '';
-if (!lastMsgError && lastMessageData?.message) {
-  lastMessage = lastMessageData.message;
-  if (lastMessageData.sender_id === '5d295b28-25ce-4e1b-baa1-8fe2e8f805f7') {
-    otherUser.nombre = 'CaminoBot';
-  }
-}
-
+        let lastMessage = '';
+        if (!lastMsgError && lastMessageData?.message) {
+          lastMessage = lastMessageData.message;
+          if (lastMessageData.sender_id === SYSTEM_USER_ID) {
+            otherUser.nombre = 'CaminoBot';
+          }
+        }
 
         return {
           id: conv.id,
@@ -182,9 +188,14 @@ if (!lastMsgError && lastMessageData?.message) {
   res.status(200).json({ data: formatted });
 };
 
-// ✅ CORREGIDO: solo cuenta mensajes no leídos en conversaciones del usuario
 exports.getUnreadMessagesCount = async (req, res) => {
-  const userId = req.user.id;
+  const userId = req.user?.id;
+  console.log('🔍 Verificando mensajes no leídos para usuario:', userId);
+
+  if (!userId) {
+    console.error('⛔ Usuario no autenticado en getUnreadMessagesCount');
+    return res.status(401).json({ error: 'Usuario no autenticado' });
+  }
 
   const { data: conversations, error: convError } = await supabase
     .from('conversations')
@@ -202,6 +213,7 @@ exports.getUnreadMessagesCount = async (req, res) => {
     .map(c => c.id);
 
   if (validConversationIds.length === 0) {
+    console.log('📭 Sin conversaciones válidas');
     return res.status(200).json({ count: 0 });
   }
 
@@ -217,6 +229,7 @@ exports.getUnreadMessagesCount = async (req, res) => {
     return res.status(500).json({ error: error.message });
   }
 
+  console.log('📬 Total mensajes no leídos:', count);
   res.status(200).json({ count });
 };
 
@@ -224,6 +237,7 @@ exports.markMessagesAsRead = async (req, res) => {
   try {
     const userId = req.user.id;
     const { conversationId } = req.params;
+    console.log('✅ Marcar como leído conversación:', conversationId);
 
     const { data: mensajes, error } = await supabase
       .from('messages')
@@ -241,6 +255,7 @@ exports.markMessagesAsRead = async (req, res) => {
       .map((msg) => msg.id);
 
     if (idsParaMarcar.length === 0) {
+      console.log('🔹 No hay mensajes para marcar como leídos');
       return res.status(200).json({ message: 'Nada que marcar como leído' });
     }
 
@@ -262,7 +277,13 @@ exports.markMessagesAsRead = async (req, res) => {
 };
 
 exports.getUnreadCountsByConversation = async (req, res) => {
-  const userId = req.user.id;
+  const userId = req.user?.id;
+  console.log('🔎 Buscando mensajes no leídos por conversación para usuario:', userId);
+
+  if (!userId) {
+    console.error('⛔ Usuario no autenticado en getUnreadCountsByConversation');
+    return res.status(401).json({ error: 'Usuario no autenticado' });
+  }
 
   const { data, error } = await supabase
     .from('messages')
@@ -280,5 +301,6 @@ exports.getUnreadCountsByConversation = async (req, res) => {
     counts[msg.conversation_id] = (counts[msg.conversation_id] || 0) + 1;
   });
 
+  console.log('📊 Conteo por conversación:', counts);
   res.status(200).json({ counts });
 };
