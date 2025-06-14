@@ -17,7 +17,7 @@ router.patch('/:id/mark-adopted', verifyToken, petController.markAsAdopted);
 router.patch('/:id/mark-available', verifyToken, petController.markAsAvailable);
 
 // 📸 Subida de imagen con multer
-router.post('/upload-photo', verifyToken, upload.single('image'), petController.uploadPetPhoto);
+router.post('/upload-photo', verifyToken, upload.array('photo', 5), petController.uploadPetPhoto);
 
 // 🧹 Eliminar una foto
 router.post('/delete-photo', verifyToken, petController.deletePetPhoto);

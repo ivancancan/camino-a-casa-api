@@ -312,40 +312,54 @@ exports.markAsAvailable = async (req, res) => {
 
 
 exports.uploadPetPhoto = async (req, res) => {
-   console.log('📤 Iniciando uploadPetPhoto');
-console.log('📎 Headers:', req.headers);
-  console.log('🧾 req.file:', req.file); // ✅ Aquí va
-    console.log('📦 req.body:', req.body);
+  console.log('📤 Iniciando uploadPetPhoto');
+  console.log('📎 Headers:', req.headers);
+  console.log('🧾 req.body:', req.body);
+  console.log('🧾 req.file:', req.file);
+  console.log('🧾 req.files:', req.files);
+
+  if (!req.files || req.files.length === 0) {
+    console.error('❌ No se recibieron archivos en la petición');
+    return res.status(400).json({ error: 'No se recibió ninguna imagen' });
+  }
 
   try {
-    if (!req.file) {
-      console.error('❌ No se recibió archivo en la petición');
-      return res.status(400).json({ error: 'No se recibió imagen' });
+    const urls = [];
+
+    for (const file of req.files) {
+      console.log('📸 Archivo recibido - fieldname:', file.fieldname);
+      console.log('📸 Archivo - originalname:', file.originalname);
+      console.log('📸 Archivo - mimetype:', file.mimetype);
+
+      const { originalname, buffer, mimetype } = file;
+      const fileExt = originalname.split('.').pop();
+      const fileName = `pet-${Date.now()}-${uuidv4()}.${fileExt}`;
+
+      const { data, error } = await supabase.storage
+        .from('pet-photos')
+        .upload(fileName, buffer, {
+          contentType: mimetype,
+          upsert: true,
+        });
+
+      if (error) {
+        console.error('❌ Error al subir a Supabase:', error.message);
+        return res.status(500).json({ error: error.message });
+      }
+
+      const url = `${process.env.SUPABASE_URL}/storage/v1/object/public/pet-photos/${fileName}`;
+      urls.push(url);
     }
 
-    const { originalname, buffer, mimetype } = req.file;
-    const fileExt = originalname.split('.').pop();
-    const fileName = `pet-${Date.now()}.${fileExt}`;
-
-    const { data, error } = await supabase.storage
-      .from('pet-photos')
-      .upload(fileName, buffer, {
-        contentType: mimetype,
-        upsert: true,
-      });
-
-    if (error) {
-      console.error('❌ Error al subir a Supabase:', error.message);
-      return res.status(500).json({ error: error.message });
-    }
-
-    const url = `${process.env.SUPABASE_URL}/storage/v1/object/public/pet-photos/${fileName}`;
-    return res.status(200).json({ url });
+    console.log('✅ Upload exitoso. URLs generadas:', urls);
+    return res.status(200).json({ urls });
   } catch (err) {
     console.error('❌ Error general en uploadPetPhoto:', err);
-    return res.status(500).json({ error: 'Error al subir imagen' });
+    return res.status(500).json({ error: 'Error al subir imágenes' });
   }
 };
+
+
 
 exports.deletePetPhoto = async (req, res) => {
   const { imageUrl } = req.body;
