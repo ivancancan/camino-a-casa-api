@@ -11,10 +11,11 @@ const PORT = process.env.PORT || 3001;
 // Middlewares globales
 app.use(cors());
 
-// ❌ NO pongas estos antes de multer
-// app.use(express.json());
-// app.use(express.urlencoded());
+// ✅ Parsers JSON antes de las rutas
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
+// Middleware de no-cache
 app.use((req, res, next) => {
   res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
   res.set('Pragma', 'no-cache');
@@ -23,7 +24,7 @@ app.use((req, res, next) => {
   next();
 });
 
-// Rutas primero
+// Rutas
 const authRoutes = require('./routes/auth.routes');
 const petRoutes = require('./routes/pet.routes');
 const adopterRoutes = require('./routes/adopter.routes');
@@ -34,15 +35,11 @@ const messageRoutes = require('./routes/message.routes');
 
 app.use('/api/auth', authRoutes);
 app.use('/api/pets', petRoutes);
-app.use('/api/adopter', adopterRoutes); // ✅ Aquí debe ir antes
+app.use('/api/adopter', adopterRoutes);
 app.use('/api/swipes', swipeRoutes);
 app.use('/api/giver', giverRoutes);
 app.use('/api/matches', matchRoutes);
 app.use('/api/messages', messageRoutes);
-
-// ✅ JSON parsers después
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Ruta base
 app.get('/', (req, res) => {

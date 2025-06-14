@@ -100,11 +100,12 @@ exports.updateAdopterDescription = async (req, res) => {
 exports.uploadAdopterPhoto = async (req, res) => {
   try {
     const userId = req.user.id;
-    const file = req.file;
+    console.log('📸 Archivos recibidos:', req.files);
+    const file = req.files?.find(f => f.fieldname === 'image');
 
     if (!file) {
-      console.warn('⚠️ No se envió ningún archivo');
-      return res.status(400).json({ error: 'No se envió ninguna imagen.' });
+      console.warn('⚠️ No se envió ningún archivo con campo \"foto\"');
+      return res.status(400).json({ error: 'No se envió ninguna imagen válida.' });
     }
 
     if (!file.mimetype.startsWith('image/')) {
