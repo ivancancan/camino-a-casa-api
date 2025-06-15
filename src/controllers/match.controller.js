@@ -21,15 +21,15 @@ exports.getConfirmedMatchesForGiver = async (req, res) => {
     .from('matches')
     .select(`
       *,
-      adopter_profiles (
-        user_id,
-        foto,
-        users!adopter_profiles_user_id_fkey (
-          id,
-          name,
-          email
-        )
-      ),
+ adopter_profiles (
+  user_id,
+  foto,
+  users!fk_adopter_user (
+    id,
+    name,
+    email
+  )
+),
       pets (
         id,
         nombre,
