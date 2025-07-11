@@ -7,6 +7,7 @@ const verifyToken = require('../middleware/auth.middleware');
 router.post('/register', authController.register);
 router.post('/login', authController.login);
 router.put('/users/:id/roles', verifyToken, authController.updateRoles);
+router.delete('/delete-account', authController.deleteAccount);
 
 router.get('/profile', verifyToken, (req, res) => {
   res.status(200).json({

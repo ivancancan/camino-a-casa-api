@@ -167,3 +167,30 @@ exports.updateRoles = async (req, res) => {
     },
   });
 };
+
+exports.deleteAccount = async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    const token = authHeader?.split(' ')[1];
+    if (!token) return res.status(401).json({ error: 'Token no proporcionado' });
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const userId = decoded.id;
+
+    // 🔥 Eliminar datos relacionados
+    await supabase.from('adopter_profiles').delete().eq('user_id', userId);
+    await supabase.from('giver_profiles').delete().eq('user_id', userId);
+    await supabase.from('pets').delete().eq('user_id', userId);
+    await supabase.from('swipes').delete().or(`adopter_id.eq.${userId},giver_id.eq.${userId}`);
+    await supabase.from('matches').delete().or(`adopter_id.eq.${userId},giver_id.eq.${userId}`);
+    await supabase.from('chats').delete().or(`adopter_id.eq.${userId},giver_id.eq.${userId}`);
+
+    // 🧨 Eliminar usuario
+    await supabase.from('users').delete().eq('id', userId);
+
+    return res.status(200).json({ message: 'Cuenta eliminada correctamente' });
+  } catch (err) {
+    console.error('❌ Error al eliminar cuenta:', err);
+    return res.status(500).json({ error: 'Error interno al eliminar cuenta' });
+  }
+};
